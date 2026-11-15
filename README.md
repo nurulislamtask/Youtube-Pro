@@ -17,16 +17,18 @@
   <img alt="License" src="https://img.shields.io/badge/license-MIT-green" />
 </p>
 
-## Features
+## What it is
 
-| | |
+YouTube Pro opens the real YouTube inside its own app and adds the extras on top. Videos, search, comments, subscriptions and your account work like YouTube, because it is YouTube.
+
+| Extra | Notes |
 |---|---|
-| Home, trending and search | Powered by the open Piped API |
-| Video playback | Up to the best available quality |
-| Music and lyrics | Full-screen player with synced lyrics (LRCLIB) |
-| SponsorBlock | Automatically skips sponsors, intros and outros |
-| 16 themes | Light, Dark and AMOLED modes (Monochrome, Catppuccin, Nord, Dracula, Gruvbox and more) |
-| Responsive | Desktop sidebar, mobile bottom bar |
+| Ad blocking | Removes video ads and ad slots |
+| SponsorBlock | Skips sponsors, intros and outros |
+| 16 themes | Light, Dark, AMOLED, plus accent themes (tap the **PRO** button, bottom right) |
+| Hide Shorts | Optional |
+| Background play | Keeps playing when the window is minimised |
+| Update notice | Shows a bar when a new version is released |
 
 ## Download
 
@@ -47,7 +49,7 @@ The app shows an **Update** button when a new version is out.
 ```bash
 npm install
 npx tauri icon public/icon.svg
-npm run tauri dev
+npx tauri dev
 ```
 
 ## Build
@@ -59,13 +61,12 @@ npm run bump -- 0.2.0
 git commit -am "Release 0.2.0" && git push
 ```
 
-## Roadmap
+## Known limits
 
-- [x] Artist page
-- [x] Library (saved videos)
-- [ ] Offline downloads
-- [ ] Playlists, history, subscriptions
-- [ ] Background play and picture-in-picture
+- Ad blocking depends on YouTube's page and can break when YouTube changes it. Updates fix that.
+- Google sign-in can be refused inside an app window. Browsing and watching work without signing in.
+- Linux needs WebKitGTK with media codecs for some videos.
+- iOS is not available (needs Apple signing).
 
 ## Credits
 
