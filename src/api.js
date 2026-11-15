@@ -1,6 +1,7 @@
 // Free, open APIs only. No keys, no paywalls: everything is unlocked.
 // Piped (used by LibreTube) for search/streams, SponsorBlock, LRCLIB for synced lyrics.
 import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
+import { getSettings } from "./store.js";
 
 // Inside the installed app, requests go through Rust (no browser CORS limits).
 const inTauri = typeof window !== "undefined" && !!window.__TAURI_INTERNALS__;
@@ -33,7 +34,8 @@ async function servers() {
 
 // Try servers one by one until one answers. Remembers the one that works.
 async function piped(path) {
-  const list = good ? [good, ...FALLBACK] : FALLBACK;
+  const custom = getSettings().server.replace(/\/$/, "");
+  const list = [custom, good, ...FALLBACK].filter(Boolean);
   const tryAll = async (urls) => {
     for (const base of urls) {
       try {
@@ -60,6 +62,10 @@ export async function search(q, filter = "all") {
 // path looks like "/channel/UC..." (uploaderUrl from search/trending items)
 export async function channel(path) {
   return piped(path);
+}
+
+export async function playlist(id) {
+  return piped(`/playlists/${id}`);
 }
 
 export async function trending(region = "US") {

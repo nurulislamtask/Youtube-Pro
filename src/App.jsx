@@ -1,191 +1,191 @@
 import React, { useEffect, useRef, useState } from "react";
-import { THEMES, applyTheme } from "./themes.js";
-import { search, trending, streams, videoId, sponsorSegments, lyrics, channel } from "./api.js";
+import Icon from "./Icon.jsx";
+import Player from "./Player.jsx";
+import { applyTheme } from "./themes.js";
+import { search, trending } from "./api.js";
 import { checkUpdate, openLink } from "./update.js";
+import { getSettings, setSettings, getList, toggleIn, pushFront } from "./store.js";
+import { VideoGrid, SongList, Chips, Albums, ArtistPage, PlaylistPage, SettingsPage, Empty } from "./views.jsx";
 
-const NAV = [
-  ["home", "⌂", "Home"],
-  ["music", "♪", "Music"],
-  ["library", "☰", "Library"],
-  ["settings", "⚙", "Settings"],
-];
+const slim = (v) => ({ url: v.url, title: v.title, thumbnail: v.thumbnail, uploaderName: v.uploaderName, uploaderUrl: v.uploaderUrl, views: v.views, duration: v.duration });
+const TOPICS = ["Music", "Gaming", "News", "Podcasts", "Movies", "Live", "Sports", "Learning"];
 
-const load = (k) => { try { return JSON.parse(localStorage[k] || "[]"); } catch { return []; } };
-const compact = (n) => Intl.NumberFormat("en", { notation: "compact" }).format(n);
-
-function Cards({ items, onPlay, onArtist }) {
-  return (
-    <div className="grid">
-      {items.filter((v) => v.url?.includes("watch")).map((v) => (
-        <div className="card" key={v.url}>
-          <button onClick={() => onPlay(v)} style={{ width: "100%", textAlign: "left" }}>
-            <img src={v.thumbnail} alt="" loading="lazy" />
-            <b>{v.title}</b>
-          </button>
-          <span>
-            {v.uploaderUrl ? <button onClick={() => onArtist(v.uploaderUrl)} style={{ textDecoration: "underline" }}>{v.uploaderName}</button> : v.uploaderName}
-            {v.views > 0 ? " · " + compact(v.views) + " views" : ""}
-          </span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function Artist({ path, onPlay, onArtist }) {
-  const [a, setA] = useState(null);
+function Feed({ page, arg, settings, onPlay, onNav }) {
+  const [items, setItems] = useState([]);
+  const [artists, setArtists] = useState([]);
   const [err, setErr] = useState("");
-  useEffect(() => { setA(null); channel(path).then(setA).catch(() => setErr("Could not load this artist.")); }, [path]);
-  if (err) return <p>{err}</p>;
-  if (!a) return <p>Loading…</p>;
-  const vids = (a.relatedStreams || []).filter((v) => v.url?.includes("watch"));
-  return (
-    <>
-      <div className="hero">
-        <img src={a.avatarUrl} alt="" />
-        <div>
-          <small>ARTIST</small>
-          <h1>{a.name}</h1>
-          <span>{a.subscriberCount > 0 ? compact(a.subscriberCount) + " subscribers" : ""}</span>
-          <div style={{ marginTop: 14 }}>
-            <button className="btn" onClick={() => vids[0] && onPlay(vids[0])}>▶ Play</button>
-          </div>
-        </div>
-      </div>
-      <h3>Popular</h3>
-      <Cards items={vids.slice(0, 5)} onPlay={onPlay} onArtist={onArtist} />
-      <h3 style={{ marginTop: 28 }}>Videos</h3>
-      <Cards items={vids} onPlay={onPlay} onArtist={onArtist} />
-    </>
-  );
-}
-
-function Player({ video, onClose, onSave }) {
-  const ref = useRef(null);
-  const [src, setSrc] = useState("");
-  const [lines, setLines] = useState([]);
-  const [now, setNow] = useState(0);
-  const [segs, setSegs] = useState([]);
-  const id = videoId(video.url);
+  const [tick, setTick] = useState(0);
 
   useEffect(() => {
-    streams(id).then((s) => {
-      const best = (s.videoStreams || []).filter((x) => !x.videoOnly && x.mimeType.includes("mp4")).sort((a, b) => b.height - a.height)[0];
-      setSrc(best?.url || s.hls || "");
-      lyrics(s.title || video.title, (s.uploader || video.uploaderName || "").replace(" - Topic", "")).then(setLines);
-    }).catch(() => {});
-    sponsorSegments(id).then(setSegs);
-  }, [id]);
+    let live = true;
+    setErr(""); setItems([]); setArtists([]);
+    const ok = (r) => live && setItems(r);
+    const bad = () => live && setErr("Could not load videos. Check your internet, then press Retry.");
+    if (page === "home" || (page === "explore" && !arg)) trending(settings.region).then(ok).catch(bad);
+    else if (page === "music") {
+      search(arg || "top songs", "music_songs").then(ok).catch(bad);
+      if (arg) search(arg, "music_artists").then((r) => live && setArtists(r)).catch(() => {});
+    } else search(arg, "all").then(ok).catch(bad);
+    return () => { live = false; };
+  }, [page, arg, tick, settings.region]);
 
-  const tick = () => {
-    const t = ref.current.currentTime;
-    setNow(t);
-    const hit = segs.find((s) => t >= s.segment[0] && t < s.segment[1]);
-    if (hit) ref.current.currentTime = hit.segment[1]; // SponsorBlock auto-skip
-  };
-  const idx = lines.reduce((a, l, i) => (l.t <= now ? i : a), -1);
-
-  return (
-    <div className="player">
-      <button className="close" onClick={onClose}>✕</button>
-      <div>
-        <video ref={ref} src={src} controls autoPlay onTimeUpdate={tick} />
-        <h2>{video.title}</h2>
-        <span>{video.uploaderName}</span>
-        <div style={{ marginTop: 12 }}><button className="btn" onClick={() => onSave(video)}>♡ Save to Library</button></div>
-      </div>
-      <div className="lyrics">
-        {lines.length === 0 && <p className="now">No lyrics found</p>}
-        {lines.map((l, i) => <p key={i} className={i === idx ? "now" : ""}>{l.text}</p>)}
-      </div>
-    </div>
-  );
-}
-
-function Appearance({ theme, setTheme, mode, setMode }) {
+  const title = page === "home" ? "Home" : page === "explore" ? (arg || "Explore") : page === "music" ? (arg ? `Music: ${arg}` : "Music") : `Results for "${arg}"`;
   return (
     <>
-      <h1>Appearance</h1>
-      <h3>Built-in themes</h3>
-      <div className="pills">
-        {["light", "dark", "amoled"].map((m) => (
-          <button key={m} className={"pill" + (mode === m ? " on" : "")} onClick={() => setMode(m)}>{m === "amoled" ? "AMOLED" : m[0].toUpperCase() + m.slice(1)}</button>
-        ))}
-      </div>
-      <div className="themes">
-        {THEMES.map((t) => (
-          <button key={t.id} className={"theme" + (theme === t.id ? " on" : "")} onClick={() => setTheme(t.id)}>
-            <span className="sw">{t.sw.map((c) => <i key={c} style={{ background: c }} />)}</span>
-            <span><b>{t.name} {theme === t.id && "✓"}</b><small>{t.desc}</small></span>
-          </button>
-        ))}
-      </div>
+      {page === "explore" && (
+        <div className="pills">
+          {TOPICS.map((t) => <button key={t} className={"pill" + (arg === t ? " on" : "")} onClick={() => onNav({ page: "explore", arg: t })}>{t}</button>)}
+        </div>
+      )}
+      <h1>{title}</h1>
+      {err && <p className="muted">{err} <button className="btn dark" onClick={() => setTick(tick + 1)}>Retry</button></p>}
+      <Chips items={[...artists, ...items]} onNav={onNav} />
+      <Albums items={items} onNav={onNav} />
+      {page === "music" ? <SongList items={items} settings={settings} onPlay={onPlay} numbered={false} /> : <VideoGrid items={items} settings={settings} onPlay={onPlay} onNav={onNav} />}
+      {!err && items.length === 0 && <Empty text="Loading…" />}
     </>
   );
 }
 
+const YOU = [
+  ["history", "history", "History"],
+  ["playlists", "list", "Playlists"],
+  ["albums", "disc", "Albums"],
+  ["watchlater", "clock", "Watch Later"],
+  ["likes", "like", "Likes"],
+  ["downloads", "download", "Downloads"],
+];
+const LISTS = { history: "history", watchlater: "watchlater", likes: "likes", downloads: "downloads" };
+
 export default function App() {
-  const [page, setPage] = useState("home");
-  const [theme, setTheme] = useState(localStorage.theme || "monochrome");
-  const [mode, setMode] = useState(localStorage.mode || "dark");
-  const [items, setItems] = useState([]);
+  const [stack, setStack] = useState([{ page: "home" }]);
+  const [idx, setIdx] = useState(0);
+  const view = stack[idx];
+  const [settings, setSettingsState] = useState(getSettings);
+  const [theme, setTheme] = useState(localStorage.getItem("theme") || "monochrome");
+  const [mode, setMode] = useState(localStorage.getItem("mode") || "dark");
   const [q, setQ] = useState("");
   const [playing, setPlaying] = useState(null);
-  const [err, setErr] = useState("");
-  const [artist, setArtist] = useState(null);
-  const [saved, setSaved] = useState(() => load("saved"));
-
-  const save = (v) => setSaved((s) => {
-    const n = s.some((x) => x.url === v.url) ? s : [v, ...s];
-    localStorage.saved = JSON.stringify(n);
-    return n;
-  });
-  const openArtist = (path) => { setPlaying(null); setArtist(path); setPage("artist"); };
-
-  useEffect(() => { applyTheme(theme, mode); localStorage.theme = theme; localStorage.mode = mode; }, [theme, mode]);
+  const [lists, setLists] = useState(() => ({ history: getList("history"), likes: getList("likes"), watchlater: getList("watchlater"), downloads: getList("downloads"), subs: getList("subs") }));
   const [update, setUpdate] = useState(null);
-  const loadHome = () => { setErr(""); trending().then(setItems).catch(() => setErr("Could not load videos. Check your internet, then press Retry.")); };
-  useEffect(() => { loadHome(); checkUpdate().then(setUpdate); }, []);
+  const [updateInfo, setUpdateInfo] = useState("");
+  const [section, setSection] = useState("appearance");
+  const [subsOpen, setSubsOpen] = useState(true);
+  const [side, setSide] = useState(true);
+  const searchRef = useRef(null);
 
-  const go = async (e) => {
-    e.preventDefault();
-    if (!q.trim()) return;
-    if (page !== "music") setPage("home");
-    try { setItems(await search(q, page === "music" ? "music_songs" : "all")); setErr(""); } catch { setErr("Search failed."); }
+  const upd = (patch) => setSettingsState(setSettings(patch));
+  const nav = (v) => { setPlaying(null); setStack([...stack.slice(0, idx + 1), v]); setIdx(idx + 1); };
+  const go = (page, arg) => nav({ page, arg });
+  const toggleList = (k, item) => setLists((l) => ({ ...l, [k]: toggleIn(k, slim(item)) }));
+  const follow = (a) => setLists((l) => ({ ...l, subs: toggleIn("subs", a) }));
+
+  const play = (v) => {
+    setPlaying(v);
+    if (!settings.incognito) setLists((l) => ({ ...l, history: pushFront("history", slim(v)) }));
   };
 
+  useEffect(() => { applyTheme(theme, mode); localStorage.setItem("theme", theme); localStorage.setItem("mode", mode); }, [theme, mode]);
+  useEffect(() => { checkUpdate().then(setUpdate); }, []);
+  useEffect(() => {
+    const k = (e) => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") { e.preventDefault(); searchRef.current?.focus(); } };
+    window.addEventListener("keydown", k);
+    return () => window.removeEventListener("keydown", k);
+  }, []);
+
+  const submit = (e) => {
+    e.preventDefault();
+    if (!q.trim()) return;
+    go(view.page === "music" ? "music" : "results", q.trim());
+  };
+
+  const manualUpdate = async () => {
+    setUpdateInfo("Checking…");
+    const u = await checkUpdate();
+    setUpdate(u);
+    setUpdateInfo(u ? `Version ${u.version} is available.` : "You have the latest version.");
+  };
+
+  const isMac = /Mac|iPhone|iPad/.test(navigator.platform);
+  const NavBtn = ({ page, ic, label, arg }) => (
+    <button className={"nav" + (["home", "explore", "music", "downloads", "settings"].includes(page) ? " m" : "") + (view.page === page && (!arg || view.arg === arg) ? " on" : "")} onClick={() => go(page, arg)}>
+      <Icon n={ic} /><span>{label}</span>
+    </button>
+  );
+
+  let main;
+  const p = view.page;
+  if (p === "settings") main = <SettingsPage {...{ section, setSection, settings, update: upd, theme, setTheme, mode, setMode, updateInfo }} onCheckUpdate={manualUpdate} />;
+  else if (p === "artist") main = <ArtistPage path={view.arg} settings={settings} isSub={lists.subs.some((s) => s.url === view.arg)} onFollow={follow} onPlay={play} onNav={nav} />;
+  else if (p === "playlist") main = <PlaylistPage id={view.arg} title={view.title} settings={settings} onPlay={play} />;
+  else if (LISTS[p]) {
+    const names = { history: "History", watchlater: "Watch Later", likes: "Likes", downloads: "Downloads" };
+    main = (
+      <>
+        <h1>{names[p]}</h1>
+        {p === "downloads" && <p className="muted">Videos you saved. Offline downloads are coming later.</p>}
+        {lists[p].length === 0 ? <Empty text="Nothing here yet." /> : <SongList items={lists[p]} settings={settings} onPlay={play} numbered={false} />}
+      </>
+    );
+  } else if (p === "playlists" || p === "albums") main = <><h1>{p === "albums" ? "Albums" : "Playlists"}</h1><Empty text="Coming soon." /></>;
+  else if (p === "blockads") main = <><h1>Block Ads</h1><p>Ads are always off. YouTube Pro plays ad-free streams, and SponsorBlock skips sponsor segments (you can turn it off in Settings, Player).</p></>;
+  else if (p === "profile") main = <><h1>Profile</h1><p className="muted">{settings.profileName}. Change your name in Settings, Profiles.</p><button className="btn dark" onClick={() => { setSection("profiles"); go("settings"); }}>Open profile settings</button></>;
+  else main = <Feed key={p} page={p} arg={view.arg} settings={settings} onPlay={play} onNav={nav} />;
+
   return (
-    <div className="app">
-      <div className="top">
-        <div className="logo"><img src="/icon.svg" alt="" />YouTube Pro</div>
-        <form className="search" onSubmit={go}><input placeholder="Search" value={q} onChange={(e) => setQ(e.target.value)} /></form>
-        {update && <button className="btn" onClick={() => openLink(update.url)}>⭳ Update to {update.version}</button>}
-      </div>
+    <div className={"app" + (side ? "" : " noside")}>
+      <header className="top">
+        <button className="ic" onClick={() => setSide(!side)} aria-label="Toggle sidebar"><Icon n="panel" /></button>
+        <div className="logo"><img src="/icon.svg" alt="" /><span>YouTube Pro</span></div>
+        <button className="ic" disabled={idx === 0} onClick={() => setIdx(idx - 1)} aria-label="Back"><Icon n="back" /></button>
+        <button className="ic" disabled={idx >= stack.length - 1} onClick={() => setIdx(idx + 1)} aria-label="Forward"><Icon n="fwd" /></button>
+        <form className="search" onSubmit={submit}>
+          <Icon n="search" size={16} />
+          <input ref={searchRef} placeholder="Search" value={q} onChange={(e) => setQ(e.target.value)} />
+          <kbd>{isMac ? "⌘K" : "Ctrl K"}</kbd>
+        </form>
+        {update && <button className="btn white sm" onClick={() => openLink(update.url)}><Icon n="download" size={16} /> Update {update.version}</button>}
+        <button className="ic" onClick={() => (update ? openLink(update.url) : go("settings") || setSection("about"))} aria-label="Notifications"><Icon n="bell" />{update && <b className="dot" />}</button>
+        <button className={"ic" + (settings.incognito ? " on" : "")} onClick={() => upd({ incognito: !settings.incognito })} aria-label="Private mode" title="Private mode"><Icon n="incognito" /></button>
+        <button className="ic" onClick={() => go("settings")} aria-label="Settings"><Icon n="settings" /></button>
+        <button className="avatar" onClick={() => go("profile")} aria-label="Profile">{(settings.profileName || "Y")[0].toUpperCase()}</button>
+      </header>
+
       <div className="body">
         <nav className="side">
-          {NAV.map(([id, ic, label]) => (
-            <button key={id} className={"nav" + (page === id ? " on" : "")} onClick={() => setPage(id)}>{ic}<span>{label}</span></button>
+          <NavBtn page="home" ic="home" label="Home" />
+          <NavBtn page="explore" ic="compass" label="Explore" />
+          <NavBtn page="music" ic="music" label="Music" />
+          <hr />
+          <button className="grp" onClick={() => setSubsOpen(!subsOpen)}>Subscriptions <Icon n="right" size={14} /><span style={{ flex: 1 }} /><Icon n="down" size={16} /></button>
+          {subsOpen && lists.subs.map((s) => (
+            <button key={s.url} className="nav sub" onClick={() => go("artist", s.url)}><img src={s.avatar} alt="" /><span>{s.name}</span></button>
           ))}
+          {subsOpen && lists.subs.length === 0 && <small className="hint">Follow an artist to see them here.</small>}
+          <hr />
+          <div className="grp">You <Icon n="right" size={14} /></div>
+          {YOU.map(([pg, ic, label]) => <NavBtn key={pg} page={pg} ic={ic} label={label} />)}
+          <div className="grow" />
+          <NavBtn page="profile" ic="user" label="Profile" />
+          <NavBtn page="settings" ic="settings" label="Settings" />
+          <NavBtn page="blockads" ic="blocks" label="Block Ads" />
         </nav>
-        <main className="main">
-          {page === "settings" ? <Appearance {...{ theme, setTheme, mode, setMode }} /> :
-           page === "artist" && artist ? <Artist path={artist} onPlay={setPlaying} onArtist={openArtist} /> :
-           page === "library" ? (
-            <>
-              <h1>Library</h1>
-              {saved.length === 0 && <p>Nothing saved yet. Open a video and tap "Save to Library".</p>}
-              <Cards items={saved} onPlay={setPlaying} onArtist={openArtist} />
-            </>
-          ) : (
-            <>
-              <h1>{page === "music" ? "Music" : "Home"}</h1>
-              {err && <p>{err} <button className="btn" onClick={loadHome}>Retry</button></p>}
-              <Cards items={items} onPlay={setPlaying} onArtist={openArtist} />
-            </>
-          )}
-        </main>
+        <main className="main">{main}</main>
       </div>
-      {playing && <Player video={playing} onClose={() => setPlaying(null)} onSave={save} />}
+
+      {playing && (
+        <Player
+          key={playing.url}
+          video={playing} settings={settings}
+          liked={lists.likes.some((x) => x.url === playing.url)}
+          saved={lists.downloads.some((x) => x.url === playing.url)}
+          onLike={(v) => toggleList("likes", v)}
+          onSave={(v) => toggleList("downloads", v)}
+          onWatchLater={(v) => toggleList("watchlater", v)}
+          onClose={() => setPlaying(null)} onPlay={play}
+          onArtist={(path) => go("artist", path)}
+        />
+      )}
     </div>
   );
 }
