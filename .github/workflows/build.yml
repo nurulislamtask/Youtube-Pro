@@ -1,10 +1,15 @@
 name: Build YouTube Pro
 
+# Every push to main builds all platforms and publishes a GitHub Release.
+# To ship an update: change the version (npm run bump -- 0.2.0), commit, push.
 on:
   push:
     branches: [main]
-    tags: ["v*"]
   workflow_dispatch:
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   desktop:
@@ -39,12 +44,27 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tagName: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'v0.1.0' }}
-          releaseName: "YouTube Pro ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'v0.1.0' }}"
-          releaseDraft: true
+          tagName: v__VERSION__
+          releaseName: "YouTube Pro v__VERSION__"
+          releaseDraft: false
+          releaseBody: |
+            ## Which file is for my device?
+
+            | Device | Download this file |
+            |---|---|
+            | **Windows** (PC / laptop) | `YouTube.Pro_..._x64-setup.exe` (easiest). `.msi` is for company/IT installs |
+            | **Android** (phone / tablet) | `YouTube-Pro-android.apk` |
+            | **Mac** (Apple Silicon and Intel) | `YouTube.Pro_..._universal.dmg` |
+            | **Linux** (any distro) | `.AppImage` (just run it). Ubuntu/Debian: `.deb`. Fedora/openSUSE: `.rpm` |
+            | **iPhone / iPad** | Not available yet (needs Apple signing) |
+
+            Ignore the `.app.tar.gz` file, it is only for developers.
+
+            The app tells you when a new version is out. Tap **Update** inside the app.
           args: ${{ matrix.args }}
 
   android:
+    needs: desktop
     runs-on: ubuntu-22.04
     permissions:
       contents: write
@@ -66,11 +86,19 @@ jobs:
       - run: npm install
       - run: npx tauri icon public/icon.svg
       - run: npx tauri android init
-      - run: npx tauri android build --apk
-      - uses: actions/upload-artifact@v4
+      # Debug-signed APK installs on any phone. A Play Store release needs your own signing key.
+      - run: npx tauri android build --apk --debug
+      - name: Name the APK
+        id: apk
+        run: |
+          APK=$(find src-tauri/gen/android -name "*.apk" | head -n 1)
+          echo "Found: $APK"
+          cp "$APK" YouTube-Pro-android.apk
+          echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+      - uses: softprops/action-gh-release@v2
         with:
-          name: youtube-pro-android
-          path: src-tauri/gen/android/app/build/outputs/apk/**/*.apk
+          tag_name: v${{ steps.apk.outputs.version }}
+          files: YouTube-Pro-android.apk
 
   ios:
     runs-on: macos-latest

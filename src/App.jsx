@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { THEMES, applyTheme } from "./themes.js";
 import { search, trending, streams, videoId, sponsorSegments, lyrics, channel } from "./api.js";
+import { checkUpdate, openLink } from "./update.js";
 
 const NAV = [
   ["home", "⌂", "Home"],
@@ -142,7 +143,9 @@ export default function App() {
   const openArtist = (path) => { setPlaying(null); setArtist(path); setPage("artist"); };
 
   useEffect(() => { applyTheme(theme, mode); localStorage.theme = theme; localStorage.mode = mode; }, [theme, mode]);
-  useEffect(() => { trending().then(setItems).catch(() => setErr("Could not load videos. Check your connection.")); }, []);
+  const [update, setUpdate] = useState(null);
+  const loadHome = () => { setErr(""); trending().then(setItems).catch(() => setErr("Could not load videos. Check your internet, then press Retry.")); };
+  useEffect(() => { loadHome(); checkUpdate().then(setUpdate); }, []);
 
   const go = async (e) => {
     e.preventDefault();
@@ -156,6 +159,7 @@ export default function App() {
       <div className="top">
         <div className="logo"><img src="/icon.svg" alt="" />YouTube Pro</div>
         <form className="search" onSubmit={go}><input placeholder="Search" value={q} onChange={(e) => setQ(e.target.value)} /></form>
+        {update && <button className="btn" onClick={() => openLink(update.url)}>⭳ Update to {update.version}</button>}
       </div>
       <div className="body">
         <nav className="side">
@@ -175,7 +179,7 @@ export default function App() {
           ) : (
             <>
               <h1>{page === "music" ? "Music" : "Home"}</h1>
-              {err && <p>{err}</p>}
+              {err && <p>{err} <button className="btn" onClick={loadHome}>Retry</button></p>}
               <Cards items={items} onPlay={setPlaying} onArtist={openArtist} />
             </>
           )}

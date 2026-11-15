@@ -32,13 +32,15 @@
 
 Get the latest installer for your device from the [Releases](../../releases) page.
 
-| Platform | File |
+| Device | File |
 |---|---|
-| Windows | `.msi` / `.exe` |
+| Windows | `x64-setup.exe` |
+| Android | `YouTube-Pro-android.apk` |
+| Mac | `.dmg` |
 | Linux | `.AppImage` / `.deb` / `.rpm` |
-| macOS | `.dmg` |
-| Android | `.apk` |
-| iOS | Build from source (needs a Mac and Apple signing) |
+| iPhone / iPad | Not available yet (needs Apple signing) |
+
+The app shows an **Update** button when a new version is out.
 
 ## Run from source
 
@@ -50,10 +52,11 @@ npm run tauri dev
 
 ## Build
 
-Push a version tag and GitHub Actions builds every platform:
+Every push to `main` builds all platforms and publishes a Release. To ship an update:
 
 ```bash
-git tag v0.1.0 && git push origin v0.1.0
+npm run bump -- 0.2.0
+git commit -am "Release 0.2.0" && git push
 ```
 
 ## Roadmap
