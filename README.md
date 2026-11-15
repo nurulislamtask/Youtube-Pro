@@ -14,7 +14,7 @@
   <img alt="macOS" src="https://img.shields.io/badge/macOS-000000?logo=apple&logoColor=white" />
   <img alt="Android" src="https://img.shields.io/badge/Android-3DDC84?logo=android&logoColor=white" />
   <img alt="iOS" src="https://img.shields.io/badge/iOS-000000?logo=ios&logoColor=white" />
-  <img alt="License" src="https://img.shields.io/badge/license-GPL--3.0-blue" />
+  <img alt="License" src="https://img.shields.io/badge/license-MIT-green" />
 </p>
 
 ## Features
@@ -67,7 +67,7 @@ git tag v0.1.0 && git push origin v0.1.0
 
 Feature ideas come from these open-source projects:
 [NouTube](https://github.com/nonbili/NouTube), [LibreTube](https://github.com/libre-tube/libretube), [Flow](https://github.com/Flow-Tube/Flow).
-Check each project's license before copying any code from it.
+If you copy code from them, follow their licenses (LibreTube is GPL-3.0).
 
 ## Disclaimer
 
@@ -75,4 +75,4 @@ YouTube Pro is not affiliated with or endorsed by YouTube or Google.
 
 ## License
 
-GPL-3.0
+MIT. This project contains no code copied from the credited projects.
