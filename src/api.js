@@ -8,6 +8,13 @@ export async function search(q, filter = "all") {
   return (await r.json()).items || [];
 }
 
+// path looks like "/channel/UC..." (uploaderUrl from search/trending items)
+export async function channel(path) {
+  const r = await fetch(`${PIPED}${path}`);
+  if (!r.ok) throw new Error("Channel failed");
+  return r.json();
+}
+
 export async function trending(region = "US") {
   const r = await fetch(`${PIPED}/trending?region=${region}`);
   if (!r.ok) throw new Error("Trending failed");

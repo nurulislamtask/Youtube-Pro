@@ -58,8 +58,9 @@ git tag v0.1.0 && git push origin v0.1.0
 
 ## Roadmap
 
-- [ ] Artist page
-- [ ] Downloads and offline playback
+- [x] Artist page
+- [x] Library (saved videos)
+- [ ] Offline downloads
 - [ ] Playlists, history, subscriptions
 - [ ] Background play and picture-in-picture
 
